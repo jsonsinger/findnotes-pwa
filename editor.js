@@ -523,9 +523,11 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
       piece.append(frag);
       r.insertNode(piece);
     }
+    // The cursor goes to the end of the words, so the highlight (or its absence) shows at once.
     const chosen = document.createRange();
     chosen.selectNodeContents(piece);
     if (piece.nodeName === 'SPAN') { const kids = [...piece.childNodes]; piece.replaceWith(...kids); if (kids.length) { chosen.setStartBefore(kids[0]); chosen.setEndAfter(kids[kids.length - 1]); } }
+    chosen.collapse(false);
     sel.removeAllRanges();
     sel.addRange(chosen);
     tidy(block);
@@ -559,7 +561,10 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   }
 
   document.addEventListener('selectionchange', () => {
-    if (!root.contains(getSelection().anchorNode)) return;
+    const sel = getSelection();
+    // While words are picked, highlights draw as an underline so the selection shows through.
+    root.classList.toggle('selecting', root.contains(sel.anchorNode) && !sel.isCollapsed);
+    if (!root.contains(sel.anchorNode)) return;
     dropEmptyMarks();
     onSelection();
   });

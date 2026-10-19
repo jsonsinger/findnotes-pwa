@@ -1028,6 +1028,14 @@ h1, h2 {
 /* A highlighted title. The field can't paint behind its own words, so a copy of the title
    sits behind it with the highlights on. The field's words go see-through, leaving its
    cursor and selection drawn over the copy. */
+/* While words are picked, a highlight turns into a gold underline, or the selection colour
+   would be lost in the yellow */
+:root :is(#item-body.selecting mark, #title-field.selecting .title-hl) {
+  background: none;
+  color: inherit;
+  box-shadow: inset 0 -3px var(--bullet);
+}
+
 .title-field {
   position: relative;
   flex: none;
