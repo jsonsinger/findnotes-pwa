@@ -2,7 +2,9 @@
 # Then open the address it prints on your phone (same Wi-Fi as this computer).
 # Unlike "python -m http.server", it tells the browser never to cache, so the phone
 # always gets your latest files instead of a mix of old and new ones.
+import gzip
 import http.server
+import io
 import os
 import socket
 import subprocess
@@ -13,6 +15,24 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    # Text files go out compressed, as GitHub Pages sends them, so a Lighthouse test on this
+    # computer measures what phones really download.
+    def send_head(self):
+        path = self.translate_path(self.path)
+        if os.path.isdir(path):
+            path = os.path.join(path, "index.html")
+        if not (path.endswith((".html", ".js", ".css", ".svg", ".webmanifest")) and os.path.isfile(path)
+                and "gzip" in self.headers.get("Accept-Encoding", "")):
+            return super().send_head()
+        with open(path, "rb") as f:
+            data = gzip.compress(f.read())
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        return io.BytesIO(data)
 
 
 def my_address():

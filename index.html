@@ -4,15 +4,14 @@
   <meta charset="utf-8">
   <!-- Only this site's own files may load or run: no inline scripts, nothing from elsewhere. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <!-- First: a browser tab goes to the install page before anything is drawn (see gate.js). -->
-  <script src="gate.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>FindNotes</title>
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#15181a">
-  <!-- After theme-color, so it can set that too -->
-  <script src="theme.js"></script>
+  <!-- Before anything is drawn: a browser tab goes to the install page, and the saved theme is
+       applied so light never flashes dark. After theme-color, so it can set that too (see gate.js). -->
+  <script src="gate.js"></script>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -97,9 +96,6 @@
     <symbol id="i-note" viewBox="0 0 24 24">
         <path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v5h5M8.5 13h7M8.5 17h5"/>
     </symbol>
-    <symbol id="i-bookmark" viewBox="0 0 24 24">
-        <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/>
-    </symbol>
     <symbol id="i-trash" viewBox="0 0 24 24">
         <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>
     </symbol>
@@ -183,9 +179,9 @@
       <button id="banner-action"></button>
     </div>
 
-    <div class="stage" id="stage">
-        <main class="list" id="list" role="list"></main>
-    </div>
+    <main class="stage" id="stage">
+        <div class="list" id="list" role="list"></div>
+    </main>
     <nav class="dots" id="dots" aria-label="Lists" hidden></nav>
     <div class="selbar" id="selbar" hidden>
         <div class="sel-fill" id="sel-fill"></div>
@@ -226,11 +222,8 @@
                 <button class="icon-btn" id="trash" aria-label="Clear draft" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-eraser"/></svg>
                 </button>
-                <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false" hidden>
-                    <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
-                </button>
-                <button class="icon-btn" id="done" aria-label="Close">
-                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
+                <button class="icon-btn" id="done" aria-label="Close" data-phase="close">
+                    <svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
                 </button>
             </span>
         </div>
@@ -459,7 +452,7 @@
        </button>
      </div>
    </section>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><button id="toast-undo" hidden>Undo</button></div>
   </div>
 
   <!-- Row shapes, cloned by app.js. Fixed markup only: user text is added with textContent. -->
@@ -487,6 +480,32 @@
       <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
       <span class="arch-text"><span class="arch-name"></span><span class="arch-sub"></span></span>
       <button class="icon-btn" data-act="restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg></button>
+    </div>
+  </template>
+  <!-- An empty list or archive: a big icon, a heading, a line of text, and on a list a
+       hand-drawn arrow down to the add bar -->
+  <template id="tpl-empty">
+    <div class="empty">
+      <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+      <strong></strong>
+      <span></span>
+      <svg class="empty-arrow" viewBox="0 0 24 34" aria-hidden="true"><path d="M12 2c-3 8 3 14 0 26M6 22l6 8 6-8"/></svg>
+    </div>
+  </template>
+  <!-- Reorder: a list (icon, name, open count) or an item (tick, title), held by its grip -->
+  <template id="tpl-re-list">
+    <div class="all-row re-row" role="listitem">
+      <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+      <span class="all-name"></span>
+      <span class="all-count"></span>
+      <button class="grip"><svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg></button>
+    </div>
+  </template>
+  <template id="tpl-re-item">
+    <div class="all-row re-row" role="listitem">
+      <span class="circle" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+      <span class="all-name"></span>
+      <button class="grip"><svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg></button>
     </div>
   </template>
   <template id="tpl-search-row">

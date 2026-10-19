@@ -17,7 +17,7 @@ const HEADING3 = /^### (.*)$/;
 const TASK = /^[-*+] \[([ xX])\] (.*)$/;
 const BULLET = /^[-*+] (.*)$/;
 
-export function parseLine(line) {
+function parseLine(line) {
   let m;
   if ((m = HEADING3.exec(line))) return { type: 'h3', text: m[1] };
   if ((m = HEADING.exec(line))) return { type: 'h', text: m[1] };
@@ -52,7 +52,7 @@ function tokens(text) {
 }
 
 // Formatted text for display elsewhere (list rows, search): no symbols at all.
-export function plainLine(line) {
+function plainLine(line) {
   const { text } = parseLine(line);
   return tokens(text).map((x) => (x.t === 'text' ? x.v : '')).join('');
 }
@@ -611,7 +611,6 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     getMarkdown,
     setMarkdown,
     isEmpty: () => [...root.children].every(isEmptyBlock), // same answer as an empty getMarkdown(), without building it
-    focus,
     caretToStart: () => { root.focus({ preventScroll: true }); const b = root.firstElementChild; if (b) caretToStart(b); },
     toggleType,
     toggleInline,

@@ -208,8 +208,6 @@ h1, h2 {
 
 .who {
   grid-area: 1 / 1;
-  color: inherit;
-  text-align: left;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -218,10 +216,6 @@ h1, h2 {
 
 .who.ghost {
   pointer-events: none;
-}
-
-.header h1 {
-  color: var(--text);
 }
 
 .header .icon-btn {
@@ -239,20 +233,9 @@ h1, h2 {
   flex: none;
 }
 
-.tile .icon {
-  width: 22px;
-  height: 22px;
-}
-
 .tile.small {
   width: 42px;
   height: 42px;
-  border-radius: 9px;
-}
-
-.tile.small .icon {
-  width: 22px;
-  height: 22px;
 }
 
 .icon-btn {
@@ -445,10 +428,6 @@ h1, h2 {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--on-accent);
-}
-
-.row.selected .circle .icon {
-  opacity: 1;
 }
 
 /* While rows are selected, this slide-to-archive bar replaces the add bar */
@@ -812,6 +791,9 @@ h1, h2 {
 .drawer.show-meta #item-body {
   flex: 1 0 auto;
   overflow: visible;
+  /* With the formatting bar showing there has to be room under the last line */
+  padding-bottom: 16px;
+  scroll-padding-bottom: 16px;
 }
 
 /* Full page: the handle tucks in closer to the top bar to leave the note more room */
@@ -821,12 +803,6 @@ h1, h2 {
 /* A sheet smaller than the screen moves with the finger instead of scrolling the note. app.js
    does that by cancelling the touch, not with touch-action: none here, because iOS kept that
    touch-action on the words after the note went full page, and a swipe on text then did nothing. */
-
-/* With the formatting bar showing there has to be room under the last line */
-.drawer.show-meta #item-body {
-  padding-bottom: 16px;
-  scroll-padding-bottom: 16px;
-}
 
 /* The blocks the editor builds: paragraph, heading, bullet, tick box */
 /* Each line is a block, so the space between lines lives here: a little around every block,
@@ -1006,11 +982,6 @@ h1, h2 {
   background: var(--line-strong);
 }
 
-.fmtbar .icon {
-  width: 22px;
-  height: 22px;
-}
-
 /* Highlighted text in a note, saved as ==text== */
 #item-body mark,
 .title-hl {
@@ -1131,26 +1102,13 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* The confirm button: a gold plus when adding, a "Done" pill when editing. */
-#done {
-  color: var(--text);
-}
-
-
-#done .icon {
-  stroke-width: 2.2;
-}
-
-/* Editing: an × in a soft circle, drawn as one SVG whose lines draw in and out.
+/* The close button: an × in a soft circle, drawn as one SVG whose lines draw in and out.
    While autosave runs the × draws away and a spinning arc draws in; when the save lands
    the arc closes into a gold ring and a tick draws itself; then both draw away and the × returns.
    Dash lengths match each path: ring 2πr ≈ 69.2, × strokes ≈ 11.4, tick ≈ 13.2. */
-.done-morph { display: none; }
+#done { position: relative; isolation: isolate; }
 
-#done[data-phase] { position: relative; isolation: isolate; }
-#done[data-phase] > .icon { display: none; }
-
-#done[data-phase]::before {
+#done::before {
   content: '';
   position: absolute;
   inset: 6px;
@@ -1158,8 +1116,6 @@ h1, h2 {
   background: var(--surface);
   z-index: -1;
 }
-
-#done[data-phase] .done-morph { display: block; }
 
 .done-morph {
   width: 28px;
@@ -1216,14 +1172,6 @@ h1, h2 {
 @media (prefers-reduced-motion: reduce) {
   .done-morph * { transition-duration: 0s !important; transition-delay: 0s !important; }
   .done-morph .m-ring { animation: none; }
-}
-
-#bookmark[aria-pressed='true'] {
-  color: var(--text-muted);
-}
-
-#bookmark[aria-pressed='true'] .icon {
-  fill: currentColor;
 }
 
 /* Story header: the created date and an optional label, only at full height */
@@ -1390,7 +1338,7 @@ h1, h2 {
   top: calc(env(safe-area-inset-top, 0px) + 44px);
   right: 12px;
   width: 214px;
-  padding: 6px 0;
+  padding: 6px;
   background: var(--popover-bg);
   border: 0.5px solid var(--line-strong);
   border-radius: 12px;
@@ -1404,24 +1352,16 @@ h1, h2 {
   gap: 12px;
   width: 100%;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 12px;
+  border-radius: 8px;
   font-size: 16px;
+  font-weight: 600;
 }
 
 .menu button .icon {
   width: 20px;
   height: 20px;
   color: var(--text-muted);
-}
-
-.menu {
-  padding: 6px;
-}
-
-.menu button {
-  border-radius: 8px;
-  padding: 0 12px;
-  font-weight: 600;
 }
 
 .menu button:not(:disabled):is(:active, :focus-visible) {
@@ -1431,10 +1371,6 @@ h1, h2 {
 
 .menu button:not(:disabled):is(:active, :focus-visible) .icon {
   color: var(--accent-text);
-}
-
-.menu hr {
-  margin: 5px 8px;
 }
 
 .menu hr {
@@ -1542,11 +1478,6 @@ h1, h2 {
 .all-row .tile.small {
   width: 36px;
   height: 36px;
-}
-
-.all-row .tile.small .icon {
-  width: 22px;
-  height: 22px;
 }
 
 .all-name {
@@ -1664,8 +1595,6 @@ h1, h2 {
 
 /* Archive screen */
 .screen > .header {
-  display: flex;
-  align-items: center;
   gap: 6px;
 }
 
@@ -1866,14 +1795,6 @@ h1, h2 {
   background: var(--surface);
 }
 
-.group .setting {
-  padding: 10px 0;
-  border-bottom: 0.5px solid var(--line);
-}
-
-.group .setting:last-child {
-  border-bottom: 0;
-}
 
 /* Inside a group, controls sit a shade lighter than the group */
 .group :is(.seg, .setting-btn, .switch, .days) {
@@ -1888,18 +1809,19 @@ h1, h2 {
   flex: none;
 }
 
-.settings-body .setting-note {
-  padding: 8px 4px 0;
-}
-
 .setting {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 52px;
-  padding: 0 20px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--line);
   font-size: 16px;
+}
+
+.setting:last-child {
+  border-bottom: 0;
 }
 
 .setting-value {
@@ -1923,7 +1845,7 @@ h1, h2 {
 }
 
 .setting-note {
-  padding: 0 20px 6px;
+  padding: 8px 4px 0;
   font-size: 14px;
   line-height: 1.4;
   color: var(--text-muted);
@@ -2262,7 +2184,7 @@ h1, h2 {
   border-radius: var(--wobble);
 }
 
-[data-style='sketch'] :is(.tile, .tile.small, .icon-grid button, .sel-knob, .sel-fill, .fmtbar button, .seg button) {
+[data-style='sketch'] :is(.tile, .icon-grid button, .sel-knob, .sel-fill, .fmtbar button, .seg button) {
   border-radius: var(--wobble-sm);
 }
 
@@ -2294,7 +2216,7 @@ h1, h2 {
 [data-style='sketch'] .re-row.done .circle { border-color: var(--ink); }
 [data-style='sketch'] .re-row.lifted { background: #eef0f4; }
 [data-style='sketch'] .done-pill { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
-[data-style='sketch'] #done[data-phase]::before { display: none; } /* Sketch draws its own wobbly circle */
+[data-style='sketch'] #done::before { display: none; } /* Sketch draws its own wobbly circle */
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */
@@ -2346,7 +2268,6 @@ h1, h2 {
 
 /* Page dots are drawn in outline */
 [data-style='sketch'] .dot::before { background: none; border: 1.5px solid var(--ink); opacity: 0.7; }
-[data-style='sketch'] .dot[aria-current='true']::before { background: var(--ink); opacity: 1; }
 
 [data-style='sketch'] .switch { box-shadow: inset 0 0 0 2px var(--ink); }
 [data-style='sketch'] .switch::after { background: var(--ink); }
@@ -2359,8 +2280,8 @@ h1, h2 {
   background: var(--surface);
 }
 
-[data-style='sketch'] .group .setting { border-bottom: 2px dashed var(--line); }
-[data-style='sketch'] .group .setting:last-child { border-bottom: 0; }
+[data-style='sketch'] .setting { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] .setting:last-child { border-bottom: 0; }
 [data-style='sketch'] .group-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
 [data-style='sketch'] .group .days { border-radius: var(--wobble-sm); }
 
@@ -2372,7 +2293,7 @@ h1, h2 {
 [data-style='sketch'] .listedit-actions .setting-btn { background: var(--surface); }
 [data-style='sketch'] .listedit-actions .setting-btn.go { background: var(--accent); }
 [data-style='sketch'] .arch-row [data-act='restore'] { border: var(--ink-line); border-radius: var(--wobble-round); background: var(--surface); color: var(--ink); }
-[data-style='sketch'] .dot[aria-current='true']::before { border-radius: 4px; background: var(--accent); border-color: var(--ink); }
+[data-style='sketch'] .dot[aria-current='true']::before { border-radius: 4px; background: var(--accent); opacity: 1; }
 
 /* A new version is waiting: a gold dot on the menu button, on Settings in the menu, and
    beside the version number in Settings, where the Update button is */

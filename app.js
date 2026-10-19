@@ -31,17 +31,17 @@ const el = {
   titleMark: $('title-mark'),
   itemBody: $('item-body'),
   noteScroll: $('note-scroll'),
-  foot: $('drawer-top'),
+  drawerTop: $('drawer-top'),
   hintIcon: $('hint-icon'),
   hintText: $('hint-text'),
   done: $('done'),
-  doneIcon: $('done-icon'),
-  bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
   metaIcon: $('meta-icon'),
   hintDone: $('hint-done'),
   toast: $('toast'),
+  toastText: $('toast-text'),
+  toastUndo: $('toast-undo'),
   menuBtn: $('menu-btn'),
   menuScrim: $('menu-scrim'),
   menu: $('menu'),
@@ -291,21 +291,13 @@ function renderRow(item) {
   return row;
 }
 
-// An empty list or archive: a big icon, a heading and a line of text. `icon` is always one of
-// ours (a list's icon goes through iconOf), so building the svg from a string is safe.
+// An empty list or archive: a big icon, a heading and a line of text (the shape is in index.html)
 function renderEmpty({ icon, heading, text, arrow = false }) {
-  const box = document.createElement('div');
-  box.className = 'empty';
-  const badge = document.createElement('span');
-  badge.className = 'empty-icon';
-  badge.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-${icon}"/></svg>`;
-  const title = document.createElement('strong');
-  title.textContent = heading;
-  const hint = document.createElement('span');
-  hint.textContent = text;
-  box.append(badge, title, hint);
-  // A hand-drawn arrow down to the add bar
-  if (arrow) box.insertAdjacentHTML('beforeend', '<svg class="empty-arrow" viewBox="0 0 24 34" aria-hidden="true"><path d="M12 2c-3 8 3 14 0 26M6 22l6 8 6-8"/></svg>');
+  const box = fromTemplate('tpl-empty');
+  box.querySelector('use').setAttribute('href', `#i-${icon}`);
+  box.querySelector('strong').textContent = heading;
+  box.querySelector('strong + span').textContent = text;
+  if (!arrow) box.querySelector('.empty-arrow').remove();
   return box;
 }
 
@@ -360,7 +352,7 @@ el.list.addEventListener('click', (e) => {
 
 /* ---------- adding an item ---------- */
 
-function addItem(title, body, extras = {}) {
+function addItem(title, body, marks) {
   const list = currentList();
   const siblings = itemsOf(list.id);
   const now = Date.now();
@@ -376,8 +368,7 @@ function addItem(title, body, extras = {}) {
     order: siblings.length ? siblings[siblings.length - 1].order + 1 : 0,
     createdAt: now,
     updatedAt: now,
-    bookmarked: !!extras.bookmarked,
-    marks: extras.marks || [],
+    marks,
   };
 
   state.items.push(item);
@@ -439,6 +430,7 @@ function restoreFocus() {
 /* ---------- toast with undo ---------- */
 
 let toastTimer = null;
+let toastUndo = null; // what Undo does for the toast showing now
 
 function hideToast() {
   clearTimeout(toastTimer);
@@ -447,24 +439,17 @@ function hideToast() {
 
 function showToast(message, onUndo, ms = 4000) {
   clearTimeout(toastTimer);
-
-  const text = document.createElement('span');
-  text.textContent = message;
-  el.toast.replaceChildren(text);
-
-  if (onUndo) {
-    const undo = document.createElement('button');
-    undo.textContent = 'Undo';
-    undo.addEventListener('click', () => {
-      hideToast();
-      onUndo();
-    });
-    el.toast.append(undo);
-  }
-
+  el.toastText.textContent = message;
+  toastUndo = onUndo;
+  el.toastUndo.hidden = !onUndo;
   el.toast.classList.add('show');
   toastTimer = setTimeout(hideToast, ms);
 }
+
+el.toastUndo.addEventListener('click', () => {
+  hideToast();
+  toastUndo?.();
+});
 
 /* ---------- the draft: a new note nobody has added yet ---------- */
 
@@ -504,7 +489,7 @@ let expanded = false;  // is the sheet more than half way up?
 
 function setHint(message, isError = false) {
   hintError = isError ? message : '';
-  el.foot.classList.toggle('error', isError);
+  el.drawerTop.classList.toggle('error', isError);
   refreshHint();
 }
 
@@ -519,12 +504,10 @@ function refreshHint() {
   const saved = hintError ? '' : unsaved ? (adding ? 'Unsaved draft' : 'Unsaved changes')
     : saving ? (adding ? 'Saving draft\u2026' : 'Saving\u2026') : savedText();
   el.hintText.textContent = hintError || saved;
-  el.foot.classList.toggle('unsaved', unsaved);
-  el.foot.classList.toggle('saving', saving);
-  // The button tells the same story: × (or + for a new note), a spinning arc while saving,
+  el.drawerTop.classList.toggle('unsaved', unsaved);
+  // The button tells the same story: an ×, a spinning arc while saving,
   // a ring and tick for a moment after
   if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
-  else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
   el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
@@ -614,11 +597,6 @@ el.fmtbar.addEventListener('click', (e) => {
   if (cmd === 'b' || cmd === 'i' || cmd === 'm') editor.toggleInline(cmd); else editor.toggleType(cmd);
   syncToolbar();
 });
-
-function setBookmark(on) {
-  el.bookmark.setAttribute('aria-pressed', String(on));
-  el.bookmark.setAttribute('aria-label', on ? 'Remove bookmark' : 'Bookmark');
-}
 
 /* ---------- highlights in a title ---------- */
 
@@ -714,13 +692,13 @@ const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeri
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
   drawer = {
-    mode, item, pending: false, bookmarked: !!item?.bookmarked, marks: [...(item?.marks || [])],
+    mode, item, pending: false, marks: [...(item?.marks || [])],
     original: item && { title: item.title, marks: item.marks || [], body: item.body, updatedAt: item.updatedAt },
   };
   hideToast();
 
   const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
-  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
+  if (draft) { drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
   el.itemTitle.value = item ? item.title : draft?.title ?? '';
   drawer.titleWas = el.itemTitle.value;
   editor.setMarkdown(item ? item.body : draft?.body ?? '');
@@ -729,7 +707,6 @@ function showDrawer(mode, item) {
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
   el.metaIcon.setAttribute('href', iconHref(currentList()));
-  setBookmark(drawer.bookmarked);
   syncTitleMark();
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
@@ -783,7 +760,6 @@ function hideDrawer() {
 function readEdits(item) {
   Object.assign(item, trimmedTitle());
   item.body = getBody().trimEnd();
-  item.bookmarked = drawer.bookmarked;
   item.updatedAt = Date.now();
 }
 
@@ -794,7 +770,7 @@ function saveEdit() {
     const title = el.itemTitle.value;
     const body = getBody();
     const empty = !title.trim() && !body.trim();
-    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, t: Date.now() });
+    writeDraft(empty ? null : { title, body, marks: drawer.marks, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
     drawer.pending = false;
     if (empty) refreshHint();
@@ -849,7 +825,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     if (el.itemTitle.value.trim()) {
       const { title, marks } = trimmedTitle();
-      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marks });
+      addItem(title, getBody().trim(), marks);
       writeDraft(null);
     }
   } else {
@@ -889,18 +865,6 @@ el.itemTitle.addEventListener('input', () => {
   setHint('');
   updateTrash();
   scheduleSave();
-});
-
-el.bookmark.addEventListener('click', () => {
-  if (!drawer) return;
-  drawer.bookmarked = !drawer.bookmarked;
-  setBookmark(drawer.bookmarked);
-  if (drawer.mode === 'add') scheduleSave();
-  // A bookmark isn't a change to the text, so it saves at once and leaves the tick alone.
-  if (drawer.mode === 'edit') {
-    drawer.item.bookmarked = drawer.bookmarked;
-    save(db.put('items', drawer.item));
-  }
 });
 
 el.itemTitle.addEventListener('scroll', syncTitleMark);
@@ -1269,9 +1233,6 @@ function dismissDrawer() {
   if (!drawer) return;
   const { mode, item, original } = drawer;
   cancelSave();
-  const title = el.itemTitle.value;
-  const body = getBody();
-  const bookmarked = drawer.bookmarked;
 
   if (mode === 'add') {
     saveEdit(); // closing keeps what you wrote as the draft; the bin clears it
@@ -1279,7 +1240,7 @@ function dismissDrawer() {
     return;
   }
 
-  const edited = { ...trimmedTitle(), body: body.trimEnd() };
+  const edited = { ...trimmedTitle(), body: getBody().trimEnd() };
   if (edited.title === original.title && sameMarks(edited.marks, original.marks) && edited.body === drawer.canon) {
     render(); // autosave doesn't redraw the list, so it may be behind
     hideDrawer();
@@ -1310,10 +1271,8 @@ el.trash.addEventListener('click', () => {
   drawer.marks = [];
   syncTitleMark();
   editor.setMarkdown('');
-  drawer.bookmarked = false;
   drawer.savedAt = 0;
   drawer.pending = drawer.saving = drawer.justSaved = false;
-  setBookmark(false);
   updateTrash();
   refreshHint();
   el.itemTitle.focus();
@@ -1431,31 +1390,18 @@ function closeReorder() {
 }
 
 function reorderRow(thing) {
-  const row = document.createElement('div');
-  row.className = 'all-row re-row';
-  row.setAttribute('role', 'listitem');
+  const lists = reorder.store === 'lists';
+  const row = fromTemplate(lists ? 'tpl-re-list' : 'tpl-re-item');
   row.dataset.id = thing.id;
-  const name = document.createElement('span');
-  name.className = 'all-name';
-  if (reorder.store === 'lists') {
-    // iconHref is always one of ours, so building the svg from a string is safe
-    row.insertAdjacentHTML('beforeend', `<span class="tile small"><svg class="icon" aria-hidden="true"><use href="${iconHref(thing)}"/></svg></span>`);
-    name.textContent = thing.name;
-    const count = document.createElement('span');
-    count.className = 'all-count';
-    count.textContent = String(state.items.filter((i) => i.listId === thing.id && !i.done).length);
-    row.append(name, count);
+  const name = lists ? thing.name : thing.title;
+  row.querySelector('.all-name').textContent = name;
+  if (lists) {
+    row.querySelector('use').setAttribute('href', iconHref(thing));
+    row.querySelector('.all-count').textContent = String(state.items.filter((i) => i.listId === thing.id && !i.done).length);
   } else {
     row.classList.toggle('done', !!thing.done);
-    row.insertAdjacentHTML('beforeend', '<span class="circle" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>');
-    name.textContent = thing.title;
-    row.append(name);
   }
-  const grip = document.createElement('button');
-  grip.className = 'grip';
-  grip.setAttribute('aria-label', `Move ${thing.name ?? thing.title}`);
-  grip.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg>';
-  row.append(grip);
+  row.querySelector('.grip').setAttribute('aria-label', `Move ${name}`);
   return row;
 }
 
@@ -2908,7 +2854,6 @@ function cleanItem(i, index) {
     title: i.title.slice(0, 500) || 'Untitled',
     body: typeof i.body === 'string' ? i.body.slice(0, 200000) : '',
     done: !!i.done,
-    bookmarked: !!i.bookmarked,
     order: num(i.order, index),
     createdAt: num(i.createdAt, now),
     updatedAt: num(i.updatedAt, now),
@@ -3120,10 +3065,14 @@ el.autoupdateSwitch.addEventListener('click', () => {
 });
 
 // After a big update (more than the last number changed, 0.0.47 to 0.1.0) say so once, so it
-// is never silent. Small ones only show the dots beforehand.
+// is never silent. Small ones only show the dots beforehand. Asks the worker only: with none
+// (the first launch, or testing on a computer) there is nothing to compare, and fetching sw.js
+// from the network while the app opens would only slow it down.
 const SEEN_VERSION_KEY = 'find-notes:seen-version';
 function noteNewVersion() {
-  appVersion().then((now) => {
+  const worker = navigator.serviceWorker?.controller;
+  if (!worker) return;
+  workerVersion(worker).then((now) => {
     if (now === 'Unknown') return;
     let seen = null;
     try { seen = localStorage.getItem(SEEN_VERSION_KEY); localStorage.setItem(SEEN_VERSION_KEY, now); } catch { return; }

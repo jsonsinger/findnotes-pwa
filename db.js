@@ -4,7 +4,7 @@ const DB_VERSION = 1;
 
 let dbPromise;
 
-export function openDB() {
+function openDB() {
   dbPromise ??= new Promise((resolve, reject) => {
     if (!globalThis.indexedDB) {
       reject(new Error('IndexedDB unavailable'));
@@ -59,15 +59,9 @@ async function run(storeNames, mode, work) {
 export const getAll = (store) =>
   run(store, 'readonly', (tx) => tx.objectStore(store).getAll());
 
-export const getByIndex = (store, index, key) =>
-  run(store, 'readonly', (tx) => tx.objectStore(store).index(index).getAll(key));
-
 // put() creates the record, or replaces it if the id already exists.
 export const put = (store, record) =>
   run(store, 'readwrite', (tx) => tx.objectStore(store).put(record));
-
-export const remove = (store, id) =>
-  run(store, 'readwrite', (tx) => tx.objectStore(store).delete(id));
 
 // Several writes in ONE transaction: they all happen, or none of them do.
 // put: [[store, record], ...]   remove: [[store, id], ...]
