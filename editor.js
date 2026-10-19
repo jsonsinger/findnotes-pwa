@@ -538,7 +538,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     // any text drawn heavy, so every heading lit up the B button.
     const at = getSelection().anchorNode;
     const { bold, italic, mark } = at && root.contains(at)
-      ? fmtOf(at.nodeType === 3 ? at : { parentNode: at })
+      ? (getSelection().isCollapsed ? fmtOf(at.nodeType === 3 ? at : { parentNode: at }) : selectedFmt())
       : { bold: false, italic: false, mark: false };
     const out = { type, bold, italic, mark };
     if (pending) {
@@ -550,6 +550,25 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     return out;
   }
 
+  // With words selected, a style is lit only when every selected letter has it (as in Docs
+  // and Word), not just the letter where the selection started.
+  function selectedFmt() {
+    const r = getSelection().getRangeAt(0);
+    const out = { bold: true, italic: true, mark: true };
+    let any = false;
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!r.intersectsNode(n)) continue;
+      const from = n === r.startContainer ? r.startOffset : 0;
+      const to = n === r.endContainer ? r.endOffset : n.length;
+      if (!n.data.slice(from, to).replace(/[\u200b\u00a0\s]/g, '')) continue;
+      any = true;
+      const f = fmtOf(n);
+      out.bold &&= f.bold; out.italic &&= f.italic; out.mark &&= f.mark;
+    }
+    return any ? out : { bold: false, italic: false, mark: false };
+  }
+
   // An empty highlight the cursor has left behind goes away.
   function dropEmptyMarks() {
     const at = getSelection().anchorNode;
@@ -558,7 +577,29 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     }
   }
 
+  // Selected words inside a highlight turn white. iOS ignores ::selection colours,
+  // so the same look is painted with a CSS custom highlight where it's supported.
+  function paintPickedMarks() {
+    if (!window.CSS?.highlights || typeof Highlight === 'undefined') return;
+    const sel = getSelection();
+    const r = sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    const parts = [];
+    if (r && root.contains(r.commonAncestorContainer)) {
+      for (const m of root.querySelectorAll('mark')) {
+        if (!r.intersectsNode(m)) continue;
+        const part = document.createRange();
+        part.selectNodeContents(m);
+        if (r.compareBoundaryPoints(Range.START_TO_START, part) > 0) part.setStart(r.startContainer, r.startOffset);
+        if (r.compareBoundaryPoints(Range.END_TO_END, part) < 0) part.setEnd(r.endContainer, r.endOffset);
+        if (!part.collapsed) parts.push(part);
+      }
+    }
+    if (parts.length) CSS.highlights.set('picked-mark', new Highlight(...parts));
+    else CSS.highlights.delete('picked-mark');
+  }
+
   document.addEventListener('selectionchange', () => {
+    paintPickedMarks();
     if (!root.contains(getSelection().anchorNode)) return;
     dropEmptyMarks();
     onSelection();

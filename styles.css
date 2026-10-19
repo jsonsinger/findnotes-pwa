@@ -1028,9 +1028,19 @@ h1, h2 {
   color: #fff;
 }
 
+/* iOS ignores ::selection colours; editor.js paints the same look with a custom highlight */
+::highlight(picked-mark) {
+  background-color: #a8873e;
+  color: #fff;
+}
+
 :root[data-theme='light'] #item-body mark::selection,
 :root[data-theme='light'] #item-body mark ::selection {
   background: #e9c34f;
+}
+
+:root[data-theme='light'] ::highlight(picked-mark) {
+  background-color: #e9c34f;
 }
 
 :root[data-theme='light'] :is(#item-body mark, .title-hl) {
