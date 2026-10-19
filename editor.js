@@ -121,6 +121,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   }
 
   function setMarkdown(md) {
+    pending = null;
     const lines = (md || '').split('\n');
     root.replaceChildren(...lines.map(buildBlock));
     refreshEmpty();
@@ -227,6 +228,16 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     sel.addRange(r);
   }
 
+  function caretToEnd(b) {
+    const r = document.createRange();
+    r.selectNodeContents(b);
+    if (b.lastChild?.nodeName === 'BR') r.setEndBefore(b.lastChild);
+    r.collapse(false);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+
   function caretToStart(b) {
     const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
     const first = walker.nextNode();
@@ -314,7 +325,8 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
       afterEdit();
       return;
     }
-    // Backspace at the very start of a heading or bullet turns it back into plain text first.
+    // Backspace on an empty bullet or tick box removes that line; at the very start of a
+    // heading or bullet with words in it, it turns the line back into plain text first.
     if (e.inputType === 'deleteContentBackward') {
       const sel = getSelection();
       if (!sel.rangeCount || !sel.isCollapsed) return;
@@ -325,7 +337,15 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
       before.setEnd(sel.anchorNode, sel.anchorOffset);
       if (before.toString() === '') {
         e.preventDefault();
-        setType(block, 'p');
+        const prev = block.previousElementSibling;
+        if ((typeOf(block) === 'li' || typeOf(block) === 'task') && isEmptyBlock(block) && prev) {
+          block.remove();
+          caretToEnd(prev);
+        } else {
+          setType(block, 'p');
+          tidy(block); // keep its <br>, or the empty line has no height
+          caretToStart(block);
+        }
         afterEdit();
       }
     }
@@ -354,6 +374,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   }
 
   root.addEventListener('input', (e) => {
+    pending = null; // whatever was waiting is in the text now
     if (e.inputType === 'insertText' && e.data === ' ') shortcut();
     afterEdit();
   });
@@ -430,11 +451,24 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     afterEdit();
   }
 
+  // With nothing selected, Bold and Italic only apply to the next letter typed, so there is
+  // no markup yet to read them from. Remember the tap here until you type or move the cursor.
+  let pending = null; // { at, bold?, italic? }
+
   function toggleInline(kind) {
     focus();
+    const sel = getSelection();
+    const collapsed = sel.rangeCount && sel.isCollapsed;
+    const was = kind === 'm' ? null : state();
     if (kind === 'm') toggleMark();
     else document.execCommand(kind === 'b' ? 'bold' : 'italic');
     afterEdit();
+    if (kind === 'm') return;
+    if (!collapsed) { pending = null; return; }
+    const at = caretOffset();
+    if (!pending || pending.at !== at) pending = { at };
+    const key = kind === 'b' ? 'bold' : 'italic';
+    pending[key] = !was[key];
   }
 
   // Highlighting is done by hand: the browser's own highlight command writes inline styles,
@@ -451,8 +485,24 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     };
     const outer = insideMark(r.startContainer);
     if (r.collapsed) {
-      // A tap inside a highlight removes that whole highlight.
-      if (outer) { outer.replaceWith(...outer.childNodes); block.normalize(); }
+      // While typing, the highlighter switches on or off for what you type next. An empty
+      // highlight holds the cursor (a zero-width space keeps it open); leaving one, the
+      // rest of the highlight after the cursor stays highlighted.
+      const gap = document.createTextNode('\u200b');
+      if (outer) {
+        const tail = document.createRange();
+        tail.setStart(r.startContainer, r.startOffset);
+        tail.setEnd(outer, outer.childNodes.length);
+        const rest = tail.extractContents();
+        if (rest.textContent.replace(/\u200b/g, '')) { const after = document.createElement('mark'); after.append(rest); outer.after(after); }
+        outer.after(gap);
+        if (!outer.textContent.replace(/\u200b/g, '')) outer.remove();
+      } else {
+        const m = document.createElement('mark');
+        m.append(gap);
+        r.insertNode(m);
+      }
+      collapseTo(gap, 1);
       return;
     }
     const frag = r.extractContents();
@@ -490,11 +540,28 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     const { bold, italic, mark } = at && root.contains(at)
       ? fmtOf(at.nodeType === 3 ? at : { parentNode: at })
       : { bold: false, italic: false, mark: false };
-    return { type, bold, italic, mark };
+    const out = { type, bold, italic, mark };
+    if (pending) {
+      if (getSelection().isCollapsed && caretOffset() === pending.at) {
+        if ('bold' in pending) out.bold = pending.bold;
+        if ('italic' in pending) out.italic = pending.italic;
+      } else pending = null;
+    }
+    return out;
+  }
+
+  // An empty highlight the cursor has left behind goes away.
+  function dropEmptyMarks() {
+    const at = getSelection().anchorNode;
+    for (const m of [...root.querySelectorAll('mark')]) {
+      if (!m.textContent.replace(/\u200b/g, '') && !m.contains(at)) m.remove();
+    }
   }
 
   document.addEventListener('selectionchange', () => {
-    if (root.contains(getSelection().anchorNode)) onSelection();
+    if (!root.contains(getSelection().anchorNode)) return;
+    dropEmptyMarks();
+    onSelection();
   });
 
   setMarkdown('');

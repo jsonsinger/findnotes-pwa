@@ -594,7 +594,10 @@ function syncToolbar() {
     }
     return;
   }
-  const { type, bold, italic, mark } = editor.state();
+  // Nothing is lit until the note's text has the cursor, so a note opened to read shows a quiet bar
+  const { type, bold, italic, mark } = document.activeElement === el.itemBody
+    ? editor.state()
+    : { type: 'p', bold: false, italic: false, mark: false };
   const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, m: mark, li: type === 'li', task: type === 'task' };
   for (const b of fmtButtons) {
     b.disabled = false;
@@ -731,6 +734,7 @@ function showDrawer(mode, item) {
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
   setHint('');
+  syncToolbar(); // don't show the last note's buttons lit
   syncMeta();
   updateCommit();
   clearInterval(hintTimer);
@@ -900,7 +904,10 @@ el.bookmark.addEventListener('click', () => {
 });
 
 el.itemTitle.addEventListener('scroll', syncTitleMark);
-for (const eventName of ['focus', 'blur']) el.itemTitle.addEventListener(eventName, syncToolbar);
+for (const eventName of ['focus', 'blur']) {
+  el.itemTitle.addEventListener(eventName, syncToolbar);
+  el.itemBody.addEventListener(eventName, syncToolbar);
+}
 // The highlighter shows whether the selected words are highlighted
 document.addEventListener('selectionchange', () => { if (drawer && inTitle()) syncToolbar(); });
 

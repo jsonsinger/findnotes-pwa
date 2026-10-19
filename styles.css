@@ -981,8 +981,29 @@ h1, h2 {
   font-size: 18px;
 }
 
+/* Two kinds of lit: a text style you switched on is filled gold; a bullet or tick box only
+   shows which kind of line the cursor is in, with a soft tile. */
 .fmtbar button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.fmtbar button.fmt-line[aria-pressed='true'] {
+  background: var(--accent-soft);
   color: var(--accent-text);
+}
+
+:root[data-theme='light'] .fmtbar button.fmt-line[aria-pressed='true'] {
+  color: var(--text); /* deep gold reads muddy on the pale tile */
+}
+
+/* Text styles on the left, line types on the right */
+.fmt-div {
+  flex: none;
+  width: 1px;
+  height: 26px;
+  margin: 0 4px;
+  background: var(--line-strong);
 }
 
 .fmtbar .icon {
@@ -997,6 +1018,19 @@ h1, h2 {
   border-radius: 3px;
   background: var(--accent);
   color: var(--on-accent);
+}
+
+/* Selected words inside a highlight turn white on a deeper gold, so the gold selection
+   doesn't vanish into the gold highlight */
+#item-body mark::selection,
+#item-body mark ::selection {
+  background: #a8873e;
+  color: #fff;
+}
+
+:root[data-theme='light'] #item-body mark::selection,
+:root[data-theme='light'] #item-body mark ::selection {
+  background: #e9c34f;
 }
 
 :root[data-theme='light'] :is(#item-body mark, .title-hl) {
@@ -2237,6 +2271,7 @@ h1, h2 {
 [data-style='sketch'] .icon-grid button[aria-checked='true'] { border: var(--ink-line); }
 [data-style='sketch'] .seg button[aria-checked='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
 [data-style='sketch'] .fmtbar button[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+[data-style='sketch'] .fmt-div { width: 2px; background: var(--ink); opacity: 0.5; }
 
 /* Round things are drawn round, a little lopsided */
 [data-style='sketch'] .add-item { border: var(--ink-line); border-radius: var(--wobble); }
