@@ -598,30 +598,8 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     else CSS.highlights.delete('picked-mark');
   }
 
-  // TEMPORARY (0.0.59): what the last selection in the note looked like, shown in Settings
-  // so the home-screen app on iPhone can report it. Remove once that is fixed.
-  let selReport = 'No selection made in a note yet';
-  let selEvents = 0;
-  function noteSelection() {
-    const sel = getSelection();
-    if (!sel.rangeCount || sel.isCollapsed || !root.contains(sel.anchorNode)) return;
-    selEvents++;
-    const where = (n) => (n.nodeType === 3 ? n.parentNode : n).tagName;
-    const lit = Object.entries(state()).filter(([k, v]) => v === true).map(([k]) => k).join(' ') || 'none';
-    const painted = window.CSS?.highlights?.get('picked-mark');
-    selReport = [
-      `"${String(sel).slice(0, 30)}"`,
-      `starts in ${where(sel.anchorNode)}`,
-      `focused ${document.activeElement === root}`,
-      `white on ${painted ? [...painted].map(String).join('|') : (window.CSS?.highlights ? 'nothing' : 'unsupported')}`,
-      `lit ${lit}`,
-      `events ${selEvents}`,
-    ].join(', ');
-  }
-
   document.addEventListener('selectionchange', () => {
     paintPickedMarks();
-    noteSelection();
     if (!root.contains(getSelection().anchorNode)) return;
     dropEmptyMarks();
     onSelection();
@@ -630,7 +608,6 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   setMarkdown('');
 
   return {
-    selectionReport: () => selReport,
     getMarkdown,
     setMarkdown,
     isEmpty: () => [...root.children].every(isEmptyBlock), // same answer as an empty getMarkdown(), without building it
