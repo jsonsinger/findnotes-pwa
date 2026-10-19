@@ -538,7 +538,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     // any text drawn heavy, so every heading lit up the B button.
     const at = getSelection().anchorNode;
     const { bold, italic, mark } = at && root.contains(at)
-      ? fmtOf(at.nodeType === 3 ? at : { parentNode: at })
+      ? (getSelection().isCollapsed ? fmtOf(at.nodeType === 3 ? at : { parentNode: at }) : selectedFmt())
       : { bold: false, italic: false, mark: false };
     const out = { type, bold, italic, mark };
     if (pending) {
@@ -548,6 +548,25 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
       } else pending = null;
     }
     return out;
+  }
+
+  // With words selected, a style is lit only when every selected letter has it (as in Docs
+  // and Word), not just the letter where the selection started.
+  function selectedFmt() {
+    const r = getSelection().getRangeAt(0);
+    const out = { bold: true, italic: true, mark: true };
+    let any = false;
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!r.intersectsNode(n)) continue;
+      const from = n === r.startContainer ? r.startOffset : 0;
+      const to = n === r.endContainer ? r.endOffset : n.length;
+      if (!n.data.slice(from, to).replace(/[\u200b\u00a0\s]/g, '')) continue;
+      any = true;
+      const f = fmtOf(n);
+      out.bold &&= f.bold; out.italic &&= f.italic; out.mark &&= f.mark;
+    }
+    return any ? out : { bold: false, italic: false, mark: false };
   }
 
   // An empty highlight the cursor has left behind goes away.
