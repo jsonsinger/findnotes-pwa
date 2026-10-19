@@ -909,11 +909,7 @@ for (const eventName of ['focus', 'blur']) {
   el.itemBody.addEventListener(eventName, syncToolbar);
 }
 // The highlighter shows whether the selected words are highlighted
-document.addEventListener('selectionchange', () => {
-  // While words are picked, the title's highlights draw as an underline so the selection shows through
-  el.titleField.classList.toggle('selecting', inTitle() && el.itemTitle.selectionStart !== el.itemTitle.selectionEnd);
-  if (drawer && inTitle()) syncToolbar();
-});
+document.addEventListener('selectionchange', () => { if (drawer && inTitle()) syncToolbar(); });
 
 // Enter in the title moves to the description instead of submitting.
 el.itemTitle.addEventListener('keydown', (e) => {
