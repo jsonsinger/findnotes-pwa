@@ -1020,6 +1020,19 @@ h1, h2 {
   color: var(--on-accent);
 }
 
+/* Selected words inside a highlight turn white on a deeper gold, so the gold selection
+   doesn't vanish into the gold highlight */
+#item-body mark::selection,
+#item-body mark ::selection {
+  background: #a8873e;
+  color: #fff;
+}
+
+:root[data-theme='light'] #item-body mark::selection,
+:root[data-theme='light'] #item-body mark ::selection {
+  background: #e9c34f;
+}
+
 :root[data-theme='light'] :is(#item-body mark, .title-hl) {
   background: rgba(249, 221, 122, 0.75);
   color: inherit;
