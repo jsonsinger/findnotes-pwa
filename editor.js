@@ -558,7 +558,29 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     }
   }
 
+  // Selected words inside a highlight turn white. iOS ignores ::selection colours,
+  // so the same look is painted with a CSS custom highlight where it's supported.
+  function paintPickedMarks() {
+    if (!window.CSS?.highlights || typeof Highlight === 'undefined') return;
+    const sel = getSelection();
+    const r = sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    const parts = [];
+    if (r && root.contains(r.commonAncestorContainer)) {
+      for (const m of root.querySelectorAll('mark')) {
+        if (!r.intersectsNode(m)) continue;
+        const part = document.createRange();
+        part.selectNodeContents(m);
+        if (r.compareBoundaryPoints(Range.START_TO_START, part) > 0) part.setStart(r.startContainer, r.startOffset);
+        if (r.compareBoundaryPoints(Range.END_TO_END, part) < 0) part.setEnd(r.endContainer, r.endOffset);
+        if (!part.collapsed) parts.push(part);
+      }
+    }
+    if (parts.length) CSS.highlights.set('picked-mark', new Highlight(...parts));
+    else CSS.highlights.delete('picked-mark');
+  }
+
   document.addEventListener('selectionchange', () => {
+    paintPickedMarks();
     if (!root.contains(getSelection().anchorNode)) return;
     dropEmptyMarks();
     onSelection();
