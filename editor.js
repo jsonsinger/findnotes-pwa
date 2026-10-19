@@ -485,8 +485,24 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     };
     const outer = insideMark(r.startContainer);
     if (r.collapsed) {
-      // A tap inside a highlight removes that whole highlight.
-      if (outer) { outer.replaceWith(...outer.childNodes); block.normalize(); }
+      // While typing, the highlighter switches on or off for what you type next. An empty
+      // highlight holds the cursor (a zero-width space keeps it open); leaving one, the
+      // rest of the highlight after the cursor stays highlighted.
+      const gap = document.createTextNode('\u200b');
+      if (outer) {
+        const tail = document.createRange();
+        tail.setStart(r.startContainer, r.startOffset);
+        tail.setEnd(outer, outer.childNodes.length);
+        const rest = tail.extractContents();
+        if (rest.textContent.replace(/\u200b/g, '')) { const after = document.createElement('mark'); after.append(rest); outer.after(after); }
+        outer.after(gap);
+        if (!outer.textContent.replace(/\u200b/g, '')) outer.remove();
+      } else {
+        const m = document.createElement('mark');
+        m.append(gap);
+        r.insertNode(m);
+      }
+      collapseTo(gap, 1);
       return;
     }
     const frag = r.extractContents();
@@ -534,8 +550,18 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     return out;
   }
 
+  // An empty highlight the cursor has left behind goes away.
+  function dropEmptyMarks() {
+    const at = getSelection().anchorNode;
+    for (const m of [...root.querySelectorAll('mark')]) {
+      if (!m.textContent.replace(/\u200b/g, '') && !m.contains(at)) m.remove();
+    }
+  }
+
   document.addEventListener('selectionchange', () => {
-    if (root.contains(getSelection().anchorNode)) onSelection();
+    if (!root.contains(getSelection().anchorNode)) return;
+    dropEmptyMarks();
+    onSelection();
   });
 
   setMarkdown('');
