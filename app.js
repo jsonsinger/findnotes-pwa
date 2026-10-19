@@ -2743,7 +2743,6 @@ function openSettings() {
   markTheme();
   markCleanup();
   el.counts.textContent = countText();
-  $('sel-report').textContent = editor.selectionReport(); // TEMPORARY, see editor.js
   appVersion().then((v) => { el.version.textContent = v; });
   checking = '';
   markUpdate();
