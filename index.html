@@ -48,6 +48,7 @@
       <path pathLength="1" d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
     </svg>
     <div class="boot-name">FindNotes</div>
+    <div class="boot-ver" id="boot-ver"></div>
   </div>
 
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
@@ -159,12 +160,13 @@
     <div class="tint-refresh" id="tint-refresh" aria-hidden="true" hidden></div>
     <header class="header" id="header">
       <div class="whos" id="whos">
-        <button class="who" id="who" aria-label="Edit list name and icon" aria-haspopup="dialog">
+        <button class="who" id="who" aria-describedby="who-hint" aria-haspopup="dialog">
           <span class="tile">
             <svg class="icon" aria-hidden="true"><use id="tile-icon" href="#i-list"/></svg>
           </span>
           <h1 id="title">FindNotes</h1>
         </button>
+        <span id="who-hint" hidden>Edit list name and icon</span>
       </div>
       <button class="icon-btn" id="search-btn" aria-label="Search">
         <svg class="icon"><use href="#i-search"/></svg>
