@@ -160,12 +160,13 @@
     <div class="tint-refresh" id="tint-refresh" aria-hidden="true" hidden></div>
     <header class="header" id="header">
       <div class="whos" id="whos">
-        <button class="who" id="who" aria-label="Edit list name and icon" aria-haspopup="dialog">
+        <button class="who" id="who" aria-describedby="who-hint" aria-haspopup="dialog">
           <span class="tile">
             <svg class="icon" aria-hidden="true"><use id="tile-icon" href="#i-list"/></svg>
           </span>
           <h1 id="title">FindNotes</h1>
         </button>
+        <span id="who-hint" hidden>Edit list name and icon</span>
       </div>
       <button class="icon-btn" id="search-btn" aria-label="Search">
         <svg class="icon"><use href="#i-search"/></svg>
