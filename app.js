@@ -2967,7 +2967,7 @@ function setupOffline() {
   const host = location.hostname;
   const local = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')
     || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
-  if (local && !params.has('sw')) return;
+  if (local) return;
 
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then(async (reg) => {
