@@ -2312,11 +2312,14 @@ h1, h2 {
 .has-update #version::after { display: inline-block; margin-left: 6px; vertical-align: 1px; }
 
 /* ---------- Opening screen ----------
-   While the app starts (index.html, #boot), the flame draws itself in one line and the name
-   appears under it. It starts on the phone's own white or black (what iOS shows before the page
-   paints) and settles into the theme's background. app.js adds .done when the lists are ready, which fades the screen away. */
+   Covers the app while it starts (index.html, #boot). Day to day it lifts the moment the lists
+   are ready, with nothing drawn. If that takes more than 0.3 s the flame starts drawing itself,
+   and app.js makes the line race to its end before lifting, so it is never cut off half drawn.
+   On the first open after an update (.updated) the full flame, the name and the version number
+   rolling to the new one play instead. */
 .boot {
   --boot-ink: var(--accent);
+  --boot-out: 0.06s; /* how long it takes to lift */
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -2328,7 +2331,7 @@ h1, h2 {
   /* iOS 26 takes the status bar colour from this background-color as the app opens, and keeps
      it until the keyboard next appears, so it must be the theme's own (see .boot::before) */
   background-color: var(--bg);
-  transition: opacity 0.35s ease, visibility 0s 0.35s;
+  transition: opacity var(--boot-out) ease-out, visibility 0s var(--boot-out);
   /* If app.js never gets to say it's ready, don't hide the app forever */
   animation: boot-giveup 0.35s 6s forwards;
 }
@@ -2342,12 +2345,19 @@ h1, h2 {
   inset: 0;
   z-index: -1; /* behind the flame and the name */
   background-image: linear-gradient(#fff, #fff);
-  animation: boot-settle 0.5s ease-out forwards;
+  animation: boot-settle 0.3s ease-out forwards;
 }
 
 @media (prefers-color-scheme: dark) {
   .boot::before { background-image: linear-gradient(#000, #000); }
 }
+
+/* The phone's mode and the app's theme differ (light phone, dark app, or the other way round):
+   ease out of the phone's colour instead of cutting, so it doesn't flash */
+@media (prefers-color-scheme: light) { :root:not([data-theme='light']) .boot { --boot-out: 0.35s; } }
+@media (prefers-color-scheme: dark) { :root[data-theme='light'] .boot { --boot-out: 0.35s; } }
+/* Once the flame or the version is on screen, a short fade */
+.boot.late, .boot.updated { --boot-out: 0.22s; }
 
 /* Light: the bright gold of the bullets (the light yellow is too faint for a line).
    Sketch: ink, from its own --bullet. */
@@ -2365,11 +2375,13 @@ h1, h2 {
   stroke-linejoin: round;
 }
 
-/* pathLength="1" in index.html, so a dash of 1 is the whole line */
+/* pathLength="1" in index.html, so a dash of 1 is the whole line. Drawn and still waiting,
+   it glows gently. */
 .boot-flame path {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: boot-draw 0.8s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+  animation: boot-draw 0.9s 0.3s cubic-bezier(0.5, 0, 0.4, 1) forwards,
+    boot-glow 1.6s 1.2s ease-in-out infinite;
 }
 
 .boot-name {
@@ -2378,16 +2390,39 @@ h1, h2 {
   color: var(--text);
   opacity: 0;
   translate: 0 6px;
-  animation: boot-name 0.4s 0.6s ease-out forwards;
 }
 
 [data-style='sketch'] .boot-name { font-family: var(--hand); font-size: 40px; letter-spacing: 0; }
 
+/* The version under the name, built by app.js: the digits that change are a column holding
+   the old one over the new one, which rolls up */
+.boot-ver {
+  display: flex;
+  height: 16px;
+  overflow: hidden;
+  font: 600 13px/16px ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  opacity: 0;
+}
+.boot-ver .roll { display: flex; flex-direction: column; }
+.boot-ver .roll span:last-child { color: var(--boot-ink); }
+
+/* After an update the flame draws from the start (its own keyframes, so it restarts) */
+.boot.updated .boot-flame path { animation: boot-draw-full 0.8s cubic-bezier(0.6, 0, 0.3, 1) forwards; }
+.boot.updated .boot-name { animation: boot-name 0.4s 0.6s ease-out forwards; }
+.boot.updated .boot-ver { animation: boot-name 0.3s 0.9s ease-out forwards; }
+.boot.updated .roll { animation: boot-roll 0.45s 1.25s cubic-bezier(0.3, 1.4, 0.5, 1) forwards; }
+
 @keyframes boot-draw { to { stroke-dashoffset: 0; } }
+@keyframes boot-draw-full { to { stroke-dashoffset: 0; } }
+@keyframes boot-glow { 50% { opacity: 0.45; } }
 @keyframes boot-name { to { opacity: 1; translate: 0 0; } }
+@keyframes boot-roll { to { translate: 0 -16px; } }
 @keyframes boot-settle { to { opacity: 0; } }
 @keyframes boot-giveup { to { opacity: 0; visibility: hidden; } }
 
+/* Nothing moves: the flame just appears if it's slow, and app.js shows a toast after an update */
 @media (prefers-reduced-motion: reduce) {
-  .boot-flame path, .boot-name { animation: none; stroke-dashoffset: 0; opacity: 1; translate: none; }
+  .boot-flame path { stroke-dashoffset: 0; opacity: 0; animation: boot-name 0s 0.3s forwards; }
 }

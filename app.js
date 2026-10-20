@@ -3064,25 +3064,25 @@ el.autoupdateSwitch.addEventListener('click', () => {
   markUpdate();
 });
 
-// After a big update (more than the last number changed, 0.0.47 to 0.1.0) say so once, so it
-// is never silent. Small ones only show the dots beforehand. Asks the worker only: with none
-// (the first launch, or testing on a computer) there is nothing to compare, and fetching sw.js
-// from the network while the app opens would only slow it down.
+// The first open after an update shows the new version on the opening screen (see hideBoot).
+// Asks the worker only: with none (the first launch, or testing on a computer) there is
+// nothing to compare, and fetching sw.js from the network while the app opens would slow it.
 const SEEN_VERSION_KEY = 'find-notes:seen-version';
-function noteNewVersion() {
+function newVersion() {
   const worker = navigator.serviceWorker?.controller;
-  if (!worker) return;
-  workerVersion(worker).then((now) => {
-    if (now === 'Unknown') return;
+  if (!worker) return Promise.resolve(null);
+  return workerVersion(worker).then((now) => {
+    if (now === 'Unknown') return null;
     let seen = null;
-    try { seen = localStorage.getItem(SEEN_VERSION_KEY); localStorage.setItem(SEEN_VERSION_KEY, now); } catch { return; }
-    if (seen && seen !== now && !isSmallUpdate(seen, now)) showToast('Updated to ' + now, null, 5000);
+    try { seen = localStorage.getItem(SEEN_VERSION_KEY); localStorage.setItem(SEEN_VERSION_KEY, now); } catch { return null; }
+    return seen && seen !== now ? { from: seen, to: now } : null;
   });
 }
 
 /* ---------- start ---------- */
 
 async function init() {
+  const updated = newVersion(); // asked while the lists load
   try {
     await load();
     if (!state.lists.length) {
@@ -3109,22 +3109,46 @@ async function init() {
     : state.lists[0].id;
   render();
   if (recallAll()) openAll(true);
-  hideBoot();
+  hideBoot(await updated);
 }
 
-// The opening screen (#boot in index.html) stays until the flame is drawn and the name has
-// had a moment on screen, then fades into the app. With reduced motion there is nothing to
-// watch, so it goes as soon as the lists are ready.
-const BOOT_MIN_MS = 1700;
-function hideBoot() {
+// The opening screen (#boot in index.html) lifts as soon as the lists are ready. If the flame
+// has started drawing (after 0.3 s), its line races to the end first. After an update the
+// version rolls to the new number instead, which takes about two seconds.
+function hideBoot(update) {
   const boot = document.getElementById('boot');
-  if (!boot) { noteNewVersion(); return; }
-  // performance.now() counts from when the app started opening
-  const wait = prefersReducedMotion() ? 0 : Math.max(0, BOOT_MIN_MS - performance.now());
-  setTimeout(() => {
+  if (!boot) return;
+  const lift = () => {
     boot.classList.add('done');
-    setTimeout(() => { boot.remove(); noteNewVersion(); }, 400); // after the fade in styles.css
-  }, wait);
+    setTimeout(() => boot.remove(), 400); // after the fade in styles.css
+  };
+  if (update && prefersReducedMotion()) showToast('Updated to ' + update.to, null, 5000);
+  if (update && !prefersReducedMotion()) {
+    rollVersion(update.from, update.to);
+    boot.classList.add('updated');
+    setTimeout(lift, 2050);
+    return;
+  }
+  const draw = boot.querySelector('.boot-flame path').getAnimations().find((a) => a.animationName === 'boot-draw');
+  const progress = draw?.effect.getComputedTiming().progress; // null until it starts drawing
+  if (progress == null || prefersReducedMotion()) { lift(); return; }
+  boot.classList.add('late');
+  if (progress < 1) {
+    draw.updatePlaybackRate(Math.max(1, ((1 - progress) * 900) / 160)); // the rest in 0.16 s
+    draw.finished.then(lift, lift);
+  } else lift();
+}
+
+// The version under the name: what both share stays still, and the rest of the old number
+// sits over the rest of the new one, to roll up (styles.css)
+function rollVersion(from, to) {
+  let same = 0;
+  while (same < from.length && from[same] === to[same]) same++;
+  const roll = document.createElement('span');
+  roll.className = 'roll';
+  roll.append(Object.assign(document.createElement('span'), { textContent: from.slice(same) }),
+    Object.assign(document.createElement('span'), { textContent: to.slice(same) }));
+  document.getElementById('boot-ver').replaceChildren(to.slice(0, same), roll);
 }
 
 init();
