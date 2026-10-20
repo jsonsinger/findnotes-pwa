@@ -2657,11 +2657,11 @@ function appVersion() {
   return workerVersion(worker);
 }
 
-function workerVersion(worker) {
+function workerVersion(worker, question = 'version') {
   return new Promise((resolve) => {
     const channel = new MessageChannel();
     channel.port1.onmessage = (e) => resolve(String(e.data));
-    worker.postMessage('version', [channel.port2]);
+    worker.postMessage(question, [channel.port2]);
     setTimeout(() => resolve('Unknown'), 1000); // a worker from before it could answer
   });
 }
@@ -2970,9 +2970,10 @@ function setupOffline() {
   if (local && !params.has('sw')) return;
 
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  navigator.serviceWorker.register('sw.js').then(async (reg) => {
     swReg = reg;
-    if (reg.waiting && navigator.serviceWorker.controller) updateReady(true);
+    await findStarted();
+    if (updateIsReady()) updateReady(true);
     reg.addEventListener('updatefound', () => {
       const worker = reg.installing;
       markUpdate();
@@ -2985,7 +2986,7 @@ function setupOffline() {
     // one that is waiting (if updating automatically is on).
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
-      if (reg.waiting && autoUpdate) updateReady(true);
+      if (updateIsReady() && autoUpdate) updateReady(true);
       reg.update().catch(() => {});
     });
   }, (error) => console.error('Offline support unavailable', error));
@@ -2999,13 +3000,16 @@ function setupOffline() {
 }
 
 // A new version waits until you say so: Settings > Version shows Update, and a gold dot on
-// the menu points there. With "Update automatically" on, a small update (only the last number
+// the menu points there. It waits in one of two places: as a worker still waiting, or, once
+// the app has been fully closed, as the running worker that keeps serving the old files
+// (see IN_USE in sw.js). With "Update automatically" on, a small update (only the last number
 // changes, 0.0.21 to 0.0.22) goes in by itself when the app opens or you come back to it,
 // never while you're in the middle of something. Bigger ones always wait for the button.
 const AUTOUPDATE_KEY = 'find-notes:autoupdate';
 let swReg = null;
 let checking = ''; // what Check found, shown under the version
 let waitingVersion = ''; // the version that is ready to go in, once known
+let startedVersion = ''; // a newer version the running worker holds back, if any
 let busy = false;
 let autoUpdate = false;
 try { autoUpdate = localStorage.getItem(AUTOUPDATE_KEY) === 'on'; } catch { /* storage blocked: off */ }
@@ -3018,18 +3022,36 @@ const isSmallUpdate = (from, to) => {
 // opening: the app has just started or come back, so nothing is half done
 async function updateReady(opening) {
   markUpdate();
-  if (swReg?.waiting) workerVersion(swReg.waiting).then((v) => { waitingVersion = v; markUpdate(); });
-  if (!autoUpdate || !opening || !swReg?.waiting) return;
-  const [from, to] = await Promise.all([appVersion(), workerVersion(swReg.waiting)]);
+  const next = swReg?.waiting ? workerVersion(swReg.waiting, 'latest') : Promise.resolve(startedVersion);
+  next.then((v) => { waitingVersion = v === 'Unknown' ? '' : v; markUpdate(); });
+  if (!autoUpdate || !opening || !updateIsReady()) return;
+  const [from, to] = await Promise.all([appVersion(), next]);
   if (isSmallUpdate(from, to)) installUpdate();
 }
 
-function installUpdate() {
-  swReg?.waiting?.postMessage('skip-waiting'); // the page reloads on controllerchange
+// Asks the running worker whether it holds a newer version than the one the app runs
+async function findStarted() {
+  const worker = navigator.serviceWorker.controller;
+  if (!worker) return;
+  const [now, latest] = await Promise.all([workerVersion(worker), workerVersion(worker, 'latest')]);
+  startedVersion = now !== 'Unknown' && latest !== 'Unknown' && now !== latest ? latest : '';
+}
+
+const updateIsReady = () => !!(navigator.serviceWorker.controller && (swReg?.waiting || startedVersion));
+
+async function installUpdate() {
+  if (swReg?.waiting) {
+    swReg.waiting.postMessage('skip-waiting'); // the page reloads on controllerchange
+    return;
+  }
+  const worker = navigator.serviceWorker.controller;
+  if (!startedVersion || !worker) return;
+  await workerVersion(worker, 'use-latest');
+  location.reload();
 }
 
 function markUpdate() {
-  const ready = !!(swReg?.waiting && navigator.serviceWorker.controller);
+  const ready = updateIsReady();
   document.documentElement.classList.toggle('has-update', ready);
   el.autoupdateSwitch.setAttribute('aria-checked', String(autoUpdate));
   el.updateBtn.hidden = !swReg;
@@ -3043,7 +3065,7 @@ function markUpdate() {
 }
 
 el.updateBtn.addEventListener('click', async () => {
-  if (swReg?.waiting) { installUpdate(); return; }
+  if (updateIsReady()) { installUpdate(); return; }
   if (!swReg) return;
   checking = 'Checking';
   busy = true;

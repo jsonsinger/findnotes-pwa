@@ -4,8 +4,27 @@
 // worker); `python check.py` tells you when it's due and `--fix` bumps it. Browsers notice
 // that sw.js changed, fetch the new files into a fresh cache, and the app offers an "Update"
 // button. Notes themselves are in IndexedDB and are never touched here.
-const VERSION = '0.0.62';
+const VERSION = '0.0.63';
 const CACHE = `find-notes-${VERSION}`;
+
+// The version the app runs is not always this one. Once the app is fully closed the browser
+// starts a new worker by itself, with no way to stop it, so the worker keeps serving the
+// files of the version in use (written down in IN_USE) until you tap Update.
+const IN_USE = 'find-notes:in-use';
+const cacheOf = (version) => `find-notes-${version}`;
+let inUse = null; // read once, then kept here
+
+async function getInUse() {
+  if (inUse) return inUse;
+  const saved = await (await caches.open(IN_USE)).match('version');
+  inUse = saved ? await saved.text() : VERSION;
+  return inUse;
+}
+
+async function setInUse(version) {
+  inUse = version;
+  await (await caches.open(IN_USE)).put('version', new Response(version));
+}
 
 const SHELL = [
   './',
@@ -48,16 +67,31 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('find-notes-') && k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
+  event.waitUntil((async () => {
+    // Written down every time, so the next worker knows. A worker from before 0.0.63 never
+    // wrote it, and a version whose files are gone can't be served: both move to this one.
+    const version = await getInUse();
+    await setInUse(await caches.has(cacheOf(version)) ? version : VERSION);
+    await dropOldCaches();
+    await self.clients.claim();
+  })());
 });
 
+// Keeps this version's files and those of the version in use, nothing else
+async function dropOldCaches() {
+  const keep = [CACHE, cacheOf(await getInUse())];
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((k) => k.startsWith('find-notes-') && !keep.includes(k)).map((k) => caches.delete(k)));
+}
+
 self.addEventListener('message', (event) => {
-  if (event.data === 'skip-waiting') self.skipWaiting();
-  if (event.data === 'version') event.ports[0]?.postMessage(VERSION);
+  const reply = (answer) => event.ports[0]?.postMessage(answer);
+  // Update tapped while this worker waits: it goes in now, and its files with it
+  if (event.data === 'skip-waiting') event.waitUntil(setInUse(VERSION).then(() => self.skipWaiting()));
+  // Update tapped after the browser already started this worker: the app reloads afterwards
+  if (event.data === 'use-latest') event.waitUntil(setInUse(VERSION).then(() => reply('done')).then(dropOldCaches));
+  if (event.data === 'version') event.waitUntil(getInUse().then(reply)); // what the app runs
+  if (event.data === 'latest') reply(VERSION); // what it would run after Update
 });
 
 self.addEventListener('fetch', (event) => {
@@ -65,7 +99,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return;
 
   event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
+    getInUse().then((version) => caches.open(cacheOf(version))).then(async (cache) => {
       const hit = await cache.match(request, { ignoreSearch: true });
       if (hit) return hit;
       try {
