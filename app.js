@@ -562,7 +562,9 @@ function syncHidden() {
   el.eye.setAttribute('aria-label', on ? 'Show completed items' : 'Hide completed items');
   el.eyeIcon.setAttribute('href', on ? '#i-eye-off' : '#i-eye');
   el.itemBody.classList.toggle('hide-done', on);
-  el.metaDone.hidden = !on || !ticked.length;
+  // The line keeps its room on any note with tick boxes, so the note doesn't jump when it shows
+  el.metaDone.hidden = !tasks.length;
+  el.metaDone.classList.toggle('off', !on || !ticked.length);
   el.metaDoneText.textContent = ticked.length === tasks.length ? `All ${ticked.length} completed` : `${ticked.length} completed`;
   for (const b of tasks) {
     if (!b.dataset.done) { tickedSeen.delete(b); continue; }

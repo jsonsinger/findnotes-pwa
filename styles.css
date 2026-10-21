@@ -728,7 +728,7 @@ h1, h2 {
 .drawer-actions {
   display: flex;
   align-items: center;
-  margin-right: -8px; /* the glyphs line up with the screen's right margin */
+  margin-right: -6px; /* the circles line up with the screen's right margin */
 }
 
 #item-title,
@@ -1117,9 +1117,9 @@ h1, h2 {
    While autosave runs the × draws away and a spinning arc draws in; when the save lands
    the arc closes into a gold ring and a tick draws itself; then both draw away and the × returns.
    Dash lengths match each path: ring 2πr ≈ 69.2, × strokes ≈ 11.4, tick ≈ 13.2. */
-#done, #eye { position: relative; isolation: isolate; }
+#done, #eye { position: relative; isolation: isolate; width: 44px; height: 44px; }
 
-#eye .icon { width: 20px; height: 20px; }
+#eye .icon { width: 22px; height: 22px; }
 #eye[aria-pressed='true'] { color: var(--accent-text); }
 :root[data-theme='light'] #eye[aria-pressed='true'] { color: var(--text); } /* deep gold reads muddy on the pale circle */
 #eye[aria-pressed='true']::before { background: var(--accent-soft); }
@@ -1128,7 +1128,7 @@ h1, h2 {
 #eye::before {
   content: '';
   position: absolute;
-  inset: 6px;
+  inset: 4px; /* a 36px circle */
   border-radius: 50%;
   background: var(--surface);
   z-index: -1;
@@ -1223,6 +1223,9 @@ h1, h2 {
 }
 
 .meta-done .meta-icon { color: var(--bullet); }
+
+.meta-done { transition: opacity 0.2s; }
+.meta-done.off { opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0s 0.2s; }
 
 /* The list's icon before its name, a size down from the text around it */
 .meta-list { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
