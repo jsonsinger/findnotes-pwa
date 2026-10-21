@@ -685,6 +685,11 @@ h1, h2 {
   visibility: visible;
 }
 
+/* The sheet takes focus when a note opens, so it shows no ring of its own */
+.drawer:focus {
+  outline: 0;
+}
+
 /* While it slides away, touches go to the app underneath */
 .drawer.closing,
 .scrim.closing {
