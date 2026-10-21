@@ -728,7 +728,7 @@ h1, h2 {
 .drawer-actions {
   display: flex;
   align-items: center;
-  margin-right: -8px; /* the glyphs line up with the screen's right margin */
+  margin-right: -6px; /* the circles line up with the screen's right margin */
 }
 
 #item-title,
@@ -880,6 +880,17 @@ h1, h2 {
 #item-body .b.task[data-done] {
   color: var(--text-muted);
   text-decoration: line-through;
+}
+
+/* The eye in the top bar folds completed tick boxes away. One just ticked stays a moment
+   (.linger) so you see it tick, then fades out. */
+#item-body.hide-done .b.task[data-done]:not(.linger) {
+  display: none;
+}
+
+#item-body .b.task.fading {
+  opacity: 0;
+  transition: opacity 0.25s;
 }
 
 #item-body.is-empty .b:first-child::before {
@@ -1106,12 +1117,18 @@ h1, h2 {
    While autosave runs the × draws away and a spinning arc draws in; when the save lands
    the arc closes into a gold ring and a tick draws itself; then both draw away and the × returns.
    Dash lengths match each path: ring 2πr ≈ 69.2, × strokes ≈ 11.4, tick ≈ 13.2. */
-#done { position: relative; isolation: isolate; }
+#done, #eye { position: relative; isolation: isolate; width: 44px; height: 44px; }
 
-#done::before {
+#eye .icon { width: 22px; height: 22px; }
+#eye[aria-pressed='true'] { color: var(--accent-text); }
+:root[data-theme='light'] #eye[aria-pressed='true'] { color: var(--text); } /* deep gold reads muddy on the pale circle */
+#eye[aria-pressed='true']::before { background: var(--accent-soft); }
+
+#done::before,
+#eye::before {
   content: '';
   position: absolute;
-  inset: 6px;
+  inset: 4px; /* a 36px circle */
   border-radius: 50%;
   background: var(--surface);
   z-index: -1;
@@ -1189,6 +1206,26 @@ h1, h2 {
 .drawer.show-meta .meta {
   display: flex;
 }
+
+/* While completed items are hidden, a quiet line under the list says how many: a small win */
+.meta-done {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  margin: -10px 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.drawer.show-meta .meta-done {
+  display: flex;
+}
+
+.meta-done .meta-icon { color: var(--bullet); }
+
+.meta-done { transition: opacity 0.2s; }
+.meta-done.off { opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0s 0.2s; }
 
 /* The list's icon before its name, a size down from the text around it */
 .meta-list { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
@@ -2207,7 +2244,7 @@ h1, h2 {
 
 /* Round things are drawn round, a little lopsided */
 [data-style='sketch'] .add-item { border: var(--ink-line); border-radius: var(--wobble); }
-[data-style='sketch'] :is(.addbar-plus, .circle, #done) {
+[data-style='sketch'] :is(.addbar-plus, .circle, #done, #eye) {
   border: var(--ink-line);
   border-radius: var(--wobble-round);
 }
@@ -2216,7 +2253,8 @@ h1, h2 {
 [data-style='sketch'] .re-row.done .circle { border-color: var(--ink); }
 [data-style='sketch'] .re-row.lifted { background: #eef0f4; }
 [data-style='sketch'] .done-pill { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
-[data-style='sketch'] #done::before { display: none; } /* Sketch draws its own wobbly circle */
+[data-style='sketch'] :is(#done, #eye)::before { display: none; } /* Sketch draws its own wobbly circle */
+[data-style='sketch'] #eye[aria-pressed='true'] { background: var(--accent-soft); color: var(--ink); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */

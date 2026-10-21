@@ -39,6 +39,10 @@ const el = {
   metaList: $('meta-list'),
   metaIcon: $('meta-icon'),
   hintDone: $('hint-done'),
+  eye: $('eye'),
+  eyeIcon: $('eye-icon'),
+  metaDone: $('meta-done'),
+  metaDoneText: $('meta-done-text'),
   toast: $('toast'),
   toastText: $('toast-text'),
   toastUndo: $('toast-undo'),
@@ -352,7 +356,7 @@ el.list.addEventListener('click', (e) => {
 
 /* ---------- adding an item ---------- */
 
-function addItem(title, body, marks) {
+function addItem(title, body, marks, hideDone) {
   const list = currentList();
   const siblings = itemsOf(list.id);
   const now = Date.now();
@@ -370,6 +374,7 @@ function addItem(title, body, marks) {
     updatedAt: now,
     marks,
   };
+  if (hideDone) item.hideDone = true;
 
   state.items.push(item);
   render();
@@ -534,10 +539,87 @@ let hintTimer = 0; // keeps "Saved x min ago" current while the drawer is open
 
 // The description is a small rich-text editor that saves plain Markdown (see editor.js).
 const editor = createEditor(el.itemBody, {
-  onChange: () => { updateTrash(); scheduleSave(); },
+  onChange: () => { updateTrash(); syncHidden(); scheduleSave(); },
   onSelection: () => syncToolbar(),
 });
 const getBody = () => editor.getMarkdown();
+
+/* ---------- hiding completed tick boxes ---------- */
+
+// The eye in the top bar hides a note's ticked items where they are, and a line under the list
+// counts them. It's a way of looking at the note, not an edit: it's kept on the note but
+// doesn't touch the text, the save status or the edited time.
+const hiddenBlocks = () => el.itemBody.querySelectorAll('.b.task[data-done]:not(.linger)');
+let tickedSeen = new WeakSet(); // ticked boxes already folded away, so only a fresh tick lingers
+
+function syncHidden() {
+  if (!drawer) return;
+  const tasks = [...el.itemBody.querySelectorAll('.b.task')];
+  const ticked = tasks.filter((b) => b.dataset.done);
+  const on = drawer.hideDone && tasks.length > 0;
+  el.eye.hidden = !tasks.length;
+  el.eye.setAttribute('aria-pressed', String(on));
+  el.eye.setAttribute('aria-label', on ? 'Show completed items' : 'Hide completed items');
+  el.eyeIcon.setAttribute('href', on ? '#i-eye-off' : '#i-eye');
+  el.itemBody.classList.toggle('hide-done', on);
+  // The line keeps its room on any note with tick boxes, so the note doesn't jump when it shows
+  el.metaDone.hidden = !tasks.length;
+  el.metaDone.classList.toggle('off', !on || !ticked.length);
+  el.metaDoneText.textContent = ticked.length === tasks.length ? `All ${ticked.length} completed` : `${ticked.length} completed`;
+  for (const b of tasks) {
+    if (!b.dataset.done) { tickedSeen.delete(b); continue; }
+    if (tickedSeen.has(b)) continue;
+    tickedSeen.add(b);
+    if (on) linger(b);
+  }
+}
+
+// A box ticked while items are hidden shows its tick, then fades and folds away
+function linger(b) {
+  b.classList.add('linger');
+  setTimeout(() => b.classList.add('fading'), 700);
+  setTimeout(() => b.classList.remove('linger', 'fading'), 950);
+}
+
+function setHideDone(on) {
+  drawer.hideDone = on;
+  tickedSeen = new WeakSet(el.itemBody.querySelectorAll('.b.task[data-done]'));
+  for (const b of el.itemBody.querySelectorAll('.linger')) b.classList.remove('linger', 'fading');
+  syncHidden();
+  if (drawer.mode !== 'edit') return; // a new note keeps it until it's added
+  if (on) drawer.item.hideDone = true; else delete drawer.item.hideDone;
+  save(db.put('items', drawer.item));
+}
+
+// The eye mustn't take focus from the text, or the keyboard would drop
+for (const eventName of ['pointerdown', 'mousedown']) {
+  el.eye.addEventListener(eventName, (e) => e.preventDefault());
+}
+el.eye.addEventListener('click', () => { if (drawer) setHideDone(!drawer.hideDone); });
+
+// An edit that would change a hidden line (typing over a selection that spans one, or
+// deleting into one from the next line) shows the items again first, so nothing changes unseen.
+// Captured on the way down, before the editor's own handling runs.
+el.noteScroll.addEventListener('beforeinput', (e) => {
+  if (!drawer?.hideDone || e.target !== el.itemBody) return;
+  const hidden = [...hiddenBlocks()];
+  const sel = getSelection();
+  if (!hidden.length || !sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  let touches = hidden.some((b) => r.intersectsNode(b));
+  if (!touches && sel.isCollapsed && /^delete/.test(e.inputType)) {
+    const block = [...el.itemBody.children].find((b) => b.contains(sel.anchorNode));
+    if (block) {
+      const back = !/Forward$/.test(e.inputType);
+      const side = document.createRange();
+      side.selectNodeContents(block);
+      if (back) side.setEnd(sel.anchorNode, sel.anchorOffset); else side.setStart(sel.anchorNode, sel.anchorOffset);
+      const next = back ? block.previousElementSibling : block.nextElementSibling;
+      touches = !side.toString().replace(/\u200b/g, '') && hidden.includes(next);
+    }
+  }
+  if (touches) setHideDone(false);
+}, true);
 
 function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
@@ -692,7 +774,7 @@ const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeri
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
   drawer = {
-    mode, item, pending: false, marks: [...(item?.marks || [])],
+    mode, item, pending: false, marks: [...(item?.marks || [])], hideDone: !!item?.hideDone,
     original: item && { title: item.title, marks: item.marks || [], body: item.body, updatedAt: item.updatedAt },
   };
   hideToast();
@@ -704,6 +786,8 @@ function showDrawer(mode, item) {
   editor.setMarkdown(item ? item.body : draft?.body ?? '');
   drawer.canon = getBody(); // the saved text may differ from its tidied form; that alone is not an edit
   updateTrash();
+  tickedSeen = new WeakSet(el.itemBody.querySelectorAll('.b.task[data-done]'));
+  syncHidden();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
   el.metaIcon.setAttribute('href', iconHref(currentList()));
@@ -825,7 +909,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     if (el.itemTitle.value.trim()) {
       const { title, marks } = trimmedTitle();
-      addItem(title, getBody().trim(), marks);
+      addItem(title, getBody().trim(), marks, drawer.hideDone);
       writeDraft(null);
     }
   } else {
@@ -1271,6 +1355,8 @@ el.trash.addEventListener('click', () => {
   drawer.marks = [];
   syncTitleMark();
   editor.setMarkdown('');
+  drawer.hideDone = false;
+  syncHidden();
   drawer.savedAt = 0;
   drawer.pending = drawer.saving = drawer.justSaved = false;
   updateTrash();
@@ -2864,6 +2950,7 @@ function cleanItem(i, index) {
   }
   if (Number.isFinite(i.archivedAt)) item.archivedAt = i.archivedAt;
   if (isId(i.archivedWith)) item.archivedWith = i.archivedWith;
+  if (i.hideDone === true) item.hideDone = true;
   return item;
 }
 

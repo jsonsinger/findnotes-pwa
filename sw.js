@@ -4,7 +4,7 @@
 // worker); `python check.py` tells you when it's due and `--fix` bumps it. Browsers notice
 // that sw.js changed, fetch the new files into a fresh cache, and the app offers an "Update"
 // button. Notes themselves are in IndexedDB and are never touched here.
-const VERSION = '0.0.63';
+const VERSION = '0.0.65';
 const CACHE = `find-notes-${VERSION}`;
 
 // The version the app runs is not always this one. Once the app is fully closed the browser
