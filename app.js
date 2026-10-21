@@ -812,9 +812,10 @@ function showDrawer(mode, item) {
   animateSheet(PEEK);
 
   // Opening an existing item to read it shouldn't throw the keyboard up, so focus
-  // the Done button there instead of a text field.
+  // the sheet itself there instead of a text field. Not the Close button: the
+  // phone would ring it as if it were the thing to press.
   if (mode === 'add') el.itemTitle.focus({ preventScroll: true });
-  else el.done.focus({ preventScroll: true });
+  else el.drawer.focus({ preventScroll: true });
 }
 
 const openAdd = () => showDrawer('add', null);
