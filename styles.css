@@ -2469,3 +2469,46 @@ h1, h2 {
 @media (prefers-reduced-motion: reduce) {
   .boot-flame path { stroke-dashoffset: 0; opacity: 0; animation: boot-name 0s 0.3s forwards; }
 }
+
+/* Sideways phone: the layout is portrait only for now (landscape will be designed later).
+   Android keeps the app upright from the manifest, but iOS ignores that and can't be locked
+   from a web app, so cover it and ask for the phone to be turned back. Phones only: short and
+   touch, so a computer window or a tablet is never covered. */
+.upright { display: none; }
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .upright {
+    position: fixed;
+    inset: 0;
+    z-index: 1001; /* above the opening screen too */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    text-align: center;
+  }
+  .upright p { margin: 0; font-size: 17px; font-weight: 600; }
+  .upright .upright-sub { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+  .upright-phone {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 12px;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    /* Lies on its side like the phone, then tips upright to show which way to turn it */
+    animation: upright-tip 1.6s 0.3s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+  }
+  [data-style='sketch'] .upright-phone { stroke: var(--ink); }
+}
+@keyframes upright-tip {
+  0%, 15% { transform: rotate(-90deg); }
+  55%, 100% { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .upright-phone { animation: none; }
+}
