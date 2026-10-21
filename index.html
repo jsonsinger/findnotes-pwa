@@ -51,6 +51,16 @@
     <div class="boot-ver" id="boot-ver"></div>
   </div>
 
+  <!-- Covers the app when the phone is turned sideways: the layout is made for portrait only.
+       Android keeps the app upright from the manifest; iPhones ignore that and rotate anyway. -->
+  <div class="upright" id="upright">
+    <svg class="upright-phone" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>
+    </svg>
+    <p>Turn your phone upright</p>
+    <p class="upright-sub">FindNotes only works in portrait for now.</p>
+  </div>
+
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
   <svg class="sprite" width="0" height="0" aria-hidden="true">
     <symbol id="i-flame" viewBox="0 0 24 24">
